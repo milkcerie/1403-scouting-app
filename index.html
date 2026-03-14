@@ -349,15 +349,9 @@ select option { background:var(--bg2); }
         <label class="toggle"><input type="checkbox" id="f_died" onchange="toggleDied()"><span class="slider"></span></label>
       </div>
       <div class="dep-fields collapsible collapsed" id="diedFields">
-        <div class="field" style="margin-bottom:0.75rem;">
-          <div class="bool-row">
-            <div class="field-label-row"><label>Approx. Time Robot Died</label><button class="info-btn" onclick="showInfo('Approx. Time Robot Died','Did the robot die early in the match or late? Always included in QR output.')">i</button></div>
-            <label class="toggle"><input type="checkbox" id="f_time_died"><span class="slider"></span></label>
-          </div>
-        </div>
         <div class="field" style="margin-bottom:0;">
           <div class="bool-row">
-            <div class="field-label-row"><label>Functioning Again?</label><button class="info-btn" onclick="showInfo('Functioning Again?','Did the robot start functioning again after dying? Always included in QR output.')">i</button></div>
+            <div class="field-label-row"><label>Functioned Again Later in Match?</label><button class="info-btn" onclick="showInfo('Functioned Again Later in Match?','Did the robot recover and start functioning again during the match after dying?')">i</button></div>
             <label class="toggle"><input type="checkbox" id="f_functioning"><span class="slider"></span></label>
           </div>
         </div>
@@ -502,7 +496,14 @@ function checkRequired() {
   const btn=document.getElementById('genBtn');
   btn.disabled=!ready; btn.style.opacity=ready?'1':'0.4'; btn.style.cursor=ready?'pointer':'not-allowed';
 }
-document.getElementById('f_name').addEventListener('input',checkRequired);
+document.querySelectorAll('.ms-btn, .stepper-btn, .ft-btn, .timer-btn').forEach(btn => {
+  btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  btn.addEventListener('touchend', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    btn.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+  }, { passive: false });
+});
 document.getElementById('f_match').addEventListener('input',checkRequired);
 document.getElementById('f_team').addEventListener('input',checkRequired);
 
@@ -539,7 +540,6 @@ function generateQR() {
     b('f_attempted_climb_end'),
     b('f_kept_scoring'),
     b('f_died'),
-    document.getElementById('f_died').checked ? b('f_time_died') : 'N/A',
     document.getElementById('f_died').checked ? b('f_functioning') : 'N/A',
     b('f_tipped'),
     document.getElementById('f_comments').value,
@@ -591,8 +591,7 @@ function buildSummary() {
     ['Unsuccessfully Attempted Climb? (Endgame)', document.getElementById('f_attempted_climb_end').checked?'TRUE':'FALSE'],
     ['Kept Scoring Until End?', document.getElementById('f_kept_scoring').checked?'TRUE':'FALSE'],
     ['Died?', document.getElementById('f_died').checked?'TRUE':'FALSE'],
-    ['Approx. Time Robot Died', document.getElementById('f_died').checked ? (document.getElementById('f_time_died').checked?'TRUE':'FALSE') : 'N/A'],
-    ['Functioning Again?', document.getElementById('f_died').checked ? (document.getElementById('f_functioning').checked?'TRUE':'FALSE') : 'N/A'],
+    ['Functioned Again Later in Match?', document.getElementById('f_died').checked ? (document.getElementById('f_functioning').checked?'TRUE':'FALSE') : 'N/A'],
     ['Tipped Over?', document.getElementById('f_tipped').checked?'TRUE':'FALSE'],
     ['Comments', document.getElementById('f_comments').value||'—'],
   ];
@@ -623,7 +622,7 @@ function resetForm() {
   document.getElementById('mainForm').classList.remove('collapsed');
   document.getElementById('f_startside').value='Center';
   timerReset();
-  ['f_climbed','f_attempted_climb','f_bump','f_trench','f_defense','f_climbed_end','f_attempted_climb_end','f_kept_scoring','f_died','f_tipped','f_time_died','f_functioning'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
+  ['f_climbed','f_attempted_climb','f_bump','f_trench','f_defense','f_climbed_end','f_attempted_climb_end','f_kept_scoring','f_died','f_tipped','f_functioning'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
   document.getElementById('diedFields').classList.add('collapsed');
   document.getElementById('climbEndFields').classList.add('collapsed');
   document.getElementById('f_climb_level').value="Didn't Climb";
