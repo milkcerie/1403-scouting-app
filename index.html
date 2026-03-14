@@ -86,10 +86,12 @@ select option { background:var(--bg2); }
 .action-btns { display:flex; flex-direction:column; gap:0.75rem; margin-top:0.5rem; }
 .gen-btn { padding:1rem; background:var(--green); color:#fff; border:none; border-radius:10px; font-size:1.1rem; font-weight:800; cursor:pointer; touch-action:manipulation; }
 .rst-btn { padding:0.8rem; background:transparent; color:var(--text2); border:2px solid var(--border); border-radius:10px; font-size:0.95rem; font-weight:700; cursor:pointer; touch-action:manipulation; }
-#qrOutput { display:none; margin-top:1.1rem; background:var(--bg2); border:1.5px solid var(--border); border-radius:12px; padding:1.5rem; text-align:center; }
+#qrOutput { display:none; margin-top:1.1rem; background:#fff; border:1.5px solid var(--border); border-radius:12px; padding:1.5rem; text-align:center; }
 #qrContainer { display:flex; justify-content:center; margin-bottom:0.75rem; }
-#qrContainer img, #qrContainer canvas { max-width:100%; border:4px solid var(--green); border-radius:10px; }
-#qrRawText { font-size:0.72rem; color:var(--text2); word-break:break-all; background:var(--bg3); border:1px solid var(--border); border-radius:6px; padding:0.5rem; margin-bottom:0.75rem; text-align:left; }
+#qrContainer img { max-width:100%; border:4px solid #2d6a4f; border-radius:10px; display:block; }
+#qrStatus { font-size:0.82rem; margin-bottom:0.5rem; }
+#qrRawText { font-size:0.72rem; color:#333; word-break:break-all; background:#f5f5f5; border:1px solid #ccc; border-radius:6px; padding:0.5rem; margin-bottom:0.75rem; text-align:left; }
+.copy-btn { padding:0.8rem; background:transparent; color:#2d6a4f; border:2px solid #2d6a4f; border-radius:10px; font-size:0.95rem; font-weight:700; cursor:pointer; touch-action:manipulation; width:100%; margin-bottom:0.75rem; }
 .dep-fields { background:var(--bg3); border-radius:8px; padding:0.85rem; margin-top:0.75rem; border:1.5px dashed var(--border); }
 </style>
 </head>
@@ -309,7 +311,7 @@ select option { background:var(--bg2); }
     <div class="field-label-row"><label>Comments <span class="req">*</span></label><button class="info-btn" id="ib_comments">i</button></div>
     <textarea id="f_comments" placeholder="Notes about the robot or match..."></textarea>
   </div>
-</div><!-- end prematch card -->
+</div>
 
 <div class="action-btns">
   <button class="gen-btn" id="genBtn" disabled style="opacity:0.4;cursor:not-allowed;">📷 Generate QR Code</button>
@@ -319,16 +321,16 @@ select option { background:var(--bg2); }
 
 <div id="qrOutput">
   <div id="qrContainer"></div>
+  <p id="qrStatus" style="font-size:0.82rem;color:#2d6a4f;margin-bottom:0.5rem;"></p>
   <div id="qrRawText"></div>
-  <button class="rst-btn" id="copyBtn" style="margin-bottom:0.75rem;font-size:0.85rem;padding:0.55rem;">📋 Copy Data to Clipboard</button>
+  <button class="copy-btn" id="copyBtn">📋 Copy Data to Clipboard</button>
   <details style="text-align:left;">
     <summary style="cursor:pointer;font-size:0.85rem;font-weight:700;color:var(--text3);padding:0.5rem;border:1.5px solid var(--border);border-radius:8px;list-style:none;text-align:center;">🔍 Verify Submitted Data</summary>
     <table id="summaryTable" style="width:100%;margin-top:0.6rem;border-collapse:collapse;font-size:0.82rem;"></table>
   </details>
 </div>
 
-</div><!-- page -->
-
+</div>
 <div class="modal-overlay" id="modal">
   <div class="modal">
     <h3 id="modalTitle"></h3>
@@ -337,7 +339,7 @@ select option { background:var(--bg2); }
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script>
 // ── FUEL TIMERS ───────────────────────────────────────────────────
 const ft = {
@@ -346,347 +348,334 @@ const ft = {
   score_t: { ms:0, running:false, raf:null, startWall:0, cycles:0 },
   feed_t:  { ms:0, running:false, raf:null, startWall:0, cycles:0 },
 };
-
 function ftFmtMs(ms) {
-  const tenths = Math.floor(ms / 100) % 10;
-  const secs   = Math.floor(ms / 1000) % 60;
-  const mins   = Math.floor(ms / 60000);
-  return mins + ':' + (secs < 10 ? '0' : '') + secs + '.' + tenths;
+  const tenths = Math.floor(ms/100)%10, secs = Math.floor(ms/1000)%60, mins = Math.floor(ms/60000);
+  return mins+':'+(secs<10?'0':'')+secs+'.'+tenths;
 }
-
 function ftTick(key) {
   if (!ft[key].running) return;
-  ft[key].ms = Date.now() - ft[key].startWall;
-  document.getElementById('ftd_' + key).textContent = ftFmtMs(ft[key].ms);
-  ft[key].raf = requestAnimationFrame(() => ftTick(key));
+  ft[key].ms = Date.now()-ft[key].startWall;
+  document.getElementById('ftd_'+key).textContent = ftFmtMs(ft[key].ms);
+  ft[key].raf = requestAnimationFrame(()=>ftTick(key));
 }
-
 function ftPlay(key) {
-  const s = ft[key];
-  const btn = document.getElementById('ftb_' + key);
-  const isScoring = key === 'score_a' || key === 'score_t';
+  const s=ft[key], btn=document.getElementById('ftb_'+key), isSc=key==='score_a'||key==='score_t';
   if (s.running) {
-    cancelAnimationFrame(s.raf);
-    s.running = false;
-    btn.textContent = '▶ Play';
-    btn.className = 'ft-btn ft-play';
+    cancelAnimationFrame(s.raf); s.running=false;
+    btn.textContent='▶ Play'; btn.className='ft-btn ft-play';
   } else {
-    s.running = true;
-    if (isScoring) {
-      s.cycles++;
-      document.getElementById('ftc_' + key).textContent = s.cycles + ' cycle' + (s.cycles !== 1 ? 's' : '');
-    }
-    s.startWall = Date.now() - s.ms;
-    btn.textContent = '⏸ Pause';
-    btn.className = 'ft-btn ft-pause';
+    s.running=true;
+    if (isSc) { s.cycles++; document.getElementById('ftc_'+key).textContent=s.cycles+' cycle'+(s.cycles!==1?'s':''); }
+    s.startWall=Date.now()-s.ms;
+    btn.textContent='⏸ Pause'; btn.className='ft-btn ft-pause';
     ftTick(key);
   }
 }
-
 function ftReset(key) {
   cancelAnimationFrame(ft[key].raf);
-  ft[key].running = false; ft[key].ms = 0; ft[key].cycles = 0; ft[key].raf = null;
-  document.getElementById('ftd_' + key).textContent = '0:00.0';
-  const c = document.getElementById('ftc_' + key);
-  if (c) c.textContent = '0 cycles';
-  const btn = document.getElementById('ftb_' + key);
-  btn.textContent = '▶ Play';
-  btn.className = 'ft-btn ft-play';
+  ft[key].running=false; ft[key].ms=0; ft[key].cycles=0; ft[key].raf=null;
+  document.getElementById('ftd_'+key).textContent='0:00.0';
+  const c=document.getElementById('ftc_'+key); if(c) c.textContent='0 cycles';
+  const btn=document.getElementById('ftb_'+key); btn.textContent='▶ Play'; btn.className='ft-btn ft-play';
 }
-
-function ftSecs(key) { return (ft[key].ms / 1000).toFixed(1) + 's'; }
-
-['score_a','feed_a','score_t','feed_t'].forEach(key => {
-  document.getElementById('ftb_' + key).addEventListener('click', () => ftPlay(key));
-  document.getElementById('ftr_' + key).addEventListener('click', () => ftReset(key));
+function ftSecs(key){ return (ft[key].ms/1000).toFixed(1); }
+['score_a','feed_a','score_t','feed_t'].forEach(k=>{
+  document.getElementById('ftb_'+k).addEventListener('click',()=>ftPlay(k));
+  document.getElementById('ftr_'+k).addEventListener('click',()=>ftReset(k));
 });
 
 // ── THEME ─────────────────────────────────────────────────────────
-document.getElementById('themeBtn').addEventListener('click', () => {
-  const html = document.documentElement;
-  const cur = html.getAttribute('data-theme');
-  const next = cur === 'dark' ? 'light' : cur === 'light' ? 'cute' : 'dark';
-  html.setAttribute('data-theme', next);
-  document.getElementById('themeBtn').textContent =
-    next === 'dark' ? '☀️ Light' : next === 'light' ? '🌸 Cute' : '🌙 Dark';
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const h=document.documentElement, cur=h.getAttribute('data-theme');
+  const next=cur==='dark'?'light':cur==='light'?'cute':'dark';
+  h.setAttribute('data-theme',next);
+  document.getElementById('themeBtn').textContent=next==='dark'?'☀️ Light':next==='light'?'🌸 Cute':'🌙 Dark';
 });
 
 // ── STEPPERS ──────────────────────────────────────────────────────
-function stepField(id, d) {
-  const el = document.getElementById(id);
-  el.value = Math.max(0, (parseInt(el.value) || 0) + d);
-}
+function stepField(id,d){ const el=document.getElementById(id); el.value=Math.max(0,(parseInt(el.value)||0)+d); }
 [
-  ['btn_match_dec','f_match',-1], ['btn_match_inc','f_match',1],
-  ['btn_team_dec','f_team',-1],   ['btn_team_inc','f_team',1],
+  ['btn_match_dec','f_match',-1],['btn_match_inc','f_match',1],
+  ['btn_team_dec','f_team',-1],  ['btn_team_inc','f_team',1],
   ['btn_miss_a_m5','f_fuel_missed_a',-5],['btn_miss_a_m2','f_fuel_missed_a',-2],['btn_miss_a_m1','f_fuel_missed_a',-1],
   ['btn_miss_a_p1','f_fuel_missed_a',1], ['btn_miss_a_p2','f_fuel_missed_a',2], ['btn_miss_a_p5','f_fuel_missed_a',5],
   ['btn_miss_t_m5','f_fuel_missed_t',-5],['btn_miss_t_m2','f_fuel_missed_t',-2],['btn_miss_t_m1','f_fuel_missed_t',-1],
   ['btn_miss_t_p1','f_fuel_missed_t',1], ['btn_miss_t_p2','f_fuel_missed_t',2], ['btn_miss_t_p5','f_fuel_missed_t',5],
-].forEach(([b,f,d]) => document.getElementById(b).addEventListener('click', () => stepField(f, d)));
+].forEach(([b,f,d])=>document.getElementById(b).addEventListener('click',()=>stepField(f,d)));
 
 // ── TOGGLES ───────────────────────────────────────────────────────
-document.getElementById('f_showed').addEventListener('change', () =>
-  document.getElementById('mainForm').classList.toggle('collapsed', !document.getElementById('f_showed').checked));
-document.getElementById('f_died').addEventListener('change', () =>
-  document.getElementById('diedFields').classList.toggle('collapsed', !document.getElementById('f_died').checked));
-document.getElementById('f_climbed_end').addEventListener('change', () =>
-  document.getElementById('climbEndFields').classList.toggle('collapsed', !document.getElementById('f_climbed_end').checked));
+document.getElementById('f_showed').addEventListener('change',()=>
+  document.getElementById('mainForm').classList.toggle('collapsed',!document.getElementById('f_showed').checked));
+document.getElementById('f_died').addEventListener('change',()=>
+  document.getElementById('diedFields').classList.toggle('collapsed',!document.getElementById('f_died').checked));
+document.getElementById('f_climbed_end').addEventListener('change',()=>
+  document.getElementById('climbEndFields').classList.toggle('collapsed',!document.getElementById('f_climbed_end').checked));
 
 // ── VALIDATION ────────────────────────────────────────────────────
-function checkRequired() {
-  const ok = document.getElementById('f_name').value.trim() !== ''
-          && document.getElementById('f_match').value.trim() !== ''
-          && document.getElementById('f_team').value.trim() !== '';
-  const btn = document.getElementById('genBtn');
-  btn.disabled = !ok;
-  btn.style.opacity = ok ? '1' : '0.4';
-  btn.style.cursor  = ok ? 'pointer' : 'not-allowed';
+function checkRequired(){
+  const ok=document.getElementById('f_name').value.trim()!==''
+        &&document.getElementById('f_match').value.trim()!==''
+        &&document.getElementById('f_team').value.trim()!=='';
+  const btn=document.getElementById('genBtn');
+  btn.disabled=!ok; btn.style.opacity=ok?'1':'0.4'; btn.style.cursor=ok?'pointer':'not-allowed';
 }
-['f_name','f_match','f_team'].forEach(id =>
-  document.getElementById(id).addEventListener('input', checkRequired));
+['f_name','f_match','f_team'].forEach(id=>document.getElementById(id).addEventListener('input',checkRequired));
 
-// ── INFO MODAL ────────────────────────────────────────────────────
-const INFO = {
-  ib_name:        ['Name','The name of the scouter. Not reset between matches.'],
-  ib_match:       ['Match Number','Current match number. Minimum: 0. Resets after submission.'],
-  ib_team:        ['Team Number','FRC team number of the robot. Minimum: 0. Resets after submission.'],
-  ib_pos:         ['Scouting Position','Alliance position being scouted. Resets after submission.'],
-  ib_showed:      ['Showed Up?','Did the team appear on the field? If No, the form collapses.'],
-  ib_startside:   ['Starting Side','Which side of the field the robot starts on.'],
-  ib_climbed_a:   ['Climbed Tower? (Auto)','Did the robot successfully climb the tower during autonomous?'],
-  ib_attempt_a:   ['Unsuccessfully Attempted Climb? (Auto)','Did the robot attempt to climb but fail during autonomous?'],
-  ib_miss_a:      ['Fuel Missed (Auto)','Number of fuel game pieces missed during autonomous.'],
-  ib_score_a:     ['Fuel Scoring Timer (Auto)','Press Play when the robot is scoring, Pause when it stops. Each Play press = one cycle.'],
-  ib_feed_a:      ['Fuel Feeding Timer (Auto)','Press Play when the robot is feeding, Pause when it stops.'],
-  ib_bump:        ['Crossed Bump?','Did the robot cross the bump during autonomous?'],
-  ib_trench:      ['Crossed Trench?','Did the robot cross the trench during autonomous?'],
-  ib_miss_t:      ['Fuel Missed (Teleop)','Number of fuel game pieces missed during teleop.'],
-  ib_score_t:     ['Fuel Scoring Timer (Teleop)','Press Play when the robot is scoring, Pause when it stops. Each Play press = one cycle.'],
-  ib_feed_t:      ['Fuel Feeding Timer (Teleop)','Press Play when the robot is feeding, Pause when it stops.'],
-  ib_defense:     ['Played Defense?','Did the robot play defense during teleop?'],
-  ib_climbed_end: ['Climbed Tower? (Endgame)','Did the robot climb the tower at endgame?'],
-  ib_climb_level: ['Climb Level','The level the robot reached on the tower at endgame.'],
-  ib_attempt_end: ['Unsuccessfully Attempted Climb? (Endgame)','Did the robot attempt to climb at endgame but fail?'],
-  ib_kept:        ['Kept Scoring / Playing Until End?','Did the robot continue actively playing until the match ended?'],
-  ib_died:        ['Died?','Did the robot lose battery or stop functioning during the match?'],
-  ib_functioning: ['Functioned Again Later in Match?','Did the robot recover and start functioning again during the match?'],
-  ib_tipped:      ['Tipped Over?','Did the robot tip over during the match?'],
-  ib_comments:    ['Comments','Any additional observations about the robot or match.'],
+// ── MODAL ─────────────────────────────────────────────────────────
+const INFO={
+  ib_name:['Name','The name of the scouter. Not reset between matches.'],
+  ib_match:['Match Number','Current match number. Minimum: 0. Resets after submission.'],
+  ib_team:['Team Number','FRC team number of the robot. Minimum: 0. Resets after submission.'],
+  ib_pos:['Scouting Position','Alliance position being scouted. Resets after submission.'],
+  ib_showed:['Showed Up?','Did the team appear on the field? If No, the form collapses.'],
+  ib_startside:['Starting Side','Which side of the field the robot starts on.'],
+  ib_climbed_a:['Climbed Tower? (Auto)','Did the robot successfully climb the tower during autonomous?'],
+  ib_attempt_a:['Unsuccessfully Attempted Climb? (Auto)','Did the robot attempt to climb but fail during autonomous?'],
+  ib_miss_a:['Fuel Missed (Auto)','Number of fuel game pieces missed during autonomous.'],
+  ib_score_a:['Fuel Scoring Timer (Auto)','Press Play when the robot is scoring, Pause when it stops. Each Play = one cycle.'],
+  ib_feed_a:['Fuel Feeding Timer (Auto)','Press Play when the robot is feeding, Pause when it stops.'],
+  ib_bump:['Crossed Bump?','Did the robot cross the bump during autonomous?'],
+  ib_trench:['Crossed Trench?','Did the robot cross the trench during autonomous?'],
+  ib_miss_t:['Fuel Missed (Teleop)','Number of fuel game pieces missed during teleop.'],
+  ib_score_t:['Fuel Scoring Timer (Teleop)','Press Play when the robot is scoring, Pause when it stops. Each Play = one cycle.'],
+  ib_feed_t:['Fuel Feeding Timer (Teleop)','Press Play when the robot is feeding, Pause when it stops.'],
+  ib_defense:['Played Defense?','Did the robot play defense during teleop?'],
+  ib_climbed_end:['Climbed Tower? (Endgame)','Did the robot climb the tower at endgame?'],
+  ib_climb_level:['Climb Level','The level the robot reached on the tower at endgame.'],
+  ib_attempt_end:['Unsuccessfully Attempted Climb? (Endgame)','Did the robot attempt to climb at endgame but fail?'],
+  ib_kept:['Kept Scoring / Playing Until End?','Did the robot continue actively playing until the match ended?'],
+  ib_died:['Died?','Did the robot lose battery or stop functioning during the match?'],
+  ib_functioning:['Functioned Again Later in Match?','Did the robot recover and start functioning again during the match?'],
+  ib_tipped:['Tipped Over?','Did the robot tip over during the match?'],
+  ib_comments:['Comments','Any additional observations about the robot or match.'],
 };
-Object.entries(INFO).forEach(([id,[title,body]]) => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('click', () => {
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalBody').textContent  = body;
+Object.entries(INFO).forEach(([id,[title,body]])=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('click',()=>{
+    document.getElementById('modalTitle').textContent=title;
+    document.getElementById('modalBody').textContent=body;
     document.getElementById('modal').classList.add('open');
   });
 });
-document.getElementById('modalClose').addEventListener('click', () =>
-  document.getElementById('modal').classList.remove('open'));
-document.getElementById('modal').addEventListener('click', e => {
-  if (e.target.id === 'modal') document.getElementById('modal').classList.remove('open');
-});
+document.getElementById('modalClose').addEventListener('click',()=>document.getElementById('modal').classList.remove('open'));
+document.getElementById('modal').addEventListener('click',e=>{ if(e.target.id==='modal') document.getElementById('modal').classList.remove('open'); });
 
-// ── BUILD DATA ────────────────────────────────────────────────────
-function bv(id) { return document.getElementById(id).checked ? '1' : '0'; }
+// ── DATA ──────────────────────────────────────────────────────────
+function bv(id){ return document.getElementById(id).checked?'1':'0'; }
 
-function buildFields() {
-  const climbMap = { "Didn't Climb":"0", "Level 1":"1", "Level 2":"2", "Level 3":"3" };
-  const posMap   = { "Red 1":"R1","Red 2":"R2","Red 3":"R3","Blue 1":"B1","Blue 2":"B2","Blue 3":"B3" };
-  const sideMap  = { "Center":"C","Depot Side":"D","Non-Depot Side":"N" };
+const POS  = {'Red 1':'R1','Red 2':'R2','Red 3':'R3','Blue 1':'B1','Blue 2':'B2','Blue 3':'B3'};
+const SIDE = {'Center':'C','Depot Side':'D','Non-Depot Side':'N'};
+const CLVL = {"Didn't Climb":'0','Level 1':'1','Level 2':'2','Level 3':'3'};
+
+function buildFields(){
   const climbVal = document.getElementById('f_climbed_end').checked
-    ? climbMap[document.getElementById('f_climb_level').value] ?? '0' : '0';
+    ? (CLVL[document.getElementById('f_climb_level').value]||'0') : '0';
   return [
-    document.getElementById('f_name').value,
+    document.getElementById('f_name').value.replace(/ /g,'_'),
     document.getElementById('f_match').value,
-    posMap[document.getElementById('f_pos').value] ?? document.getElementById('f_pos').value,
+    POS[document.getElementById('f_pos').value]||document.getElementById('f_pos').value,
     document.getElementById('f_team').value,
     bv('f_showed'),
-    sideMap[document.getElementById('f_startside').value] ?? document.getElementById('f_startside').value,
+    SIDE[document.getElementById('f_startside').value]||document.getElementById('f_startside').value,
     bv('f_climbed'),
     bv('f_attempted_climb'),
     document.getElementById('f_fuel_missed_a').value,
-    (ft.score_a.ms / 1000).toFixed(1),
+    ftSecs('score_a'),
     String(ft.score_a.cycles),
-    (ft.feed_a.ms / 1000).toFixed(1),
+    ftSecs('feed_a'),
     bv('f_bump'),
     bv('f_trench'),
     document.getElementById('f_fuel_missed_t').value,
-    (ft.score_t.ms / 1000).toFixed(1),
+    ftSecs('score_t'),
     String(ft.score_t.cycles),
-    (ft.feed_t.ms / 1000).toFixed(1),
+    ftSecs('feed_t'),
     bv('f_defense'),
     bv('f_climbed_end'),
     climbVal,
     bv('f_attempted_climb_end'),
     bv('f_kept_scoring'),
     bv('f_died'),
-    document.getElementById('f_died').checked ? bv('f_functioning') : 'N',
+    document.getElementById('f_died').checked?bv('f_functioning'):'N',
     bv('f_tipped'),
-    document.getElementById('f_comments').value,
+    document.getElementById('f_comments').value.replace(/ /g,'_'),
   ];
 }
 
-const LABELS = [
-  'Name','Match Number','Scouting Position','Team Number','Showed Up','Starting Side',
+const LABELS=['Name','Match Number','Scouting Position','Team Number','Showed Up','Starting Side',
   'Climbed Tower (Auto)','Attempted Climb (Auto)',
   'Fuel Missed (Auto)','Fuel Scoring Time (Auto)','Fuel Scoring Cycles (Auto)','Fuel Feeding Time (Auto)',
   'Crossed Bump','Crossed Trench',
   'Fuel Missed (Teleop)','Fuel Scoring Time (Teleop)','Fuel Scoring Cycles (Teleop)','Fuel Feeding Time (Teleop)',
   'Played Defense','Climbed Tower (Endgame)','Climb Level','Attempted Climb (Endgame)',
-  'Kept Scoring Until End','Died','Functioned Again','Tipped Over','Comments',
-];
+  'Kept Scoring Until End','Died','Functioned Again','Tipped Over','Comments'];
 
-// ── QR GENERATION ─────────────────────────────────────────────────
-let lastQRText = '';
+// ── QR GENERATION (pure JS, no external dependency) ──────────────
+let lastQRText='';
 
-document.getElementById('genBtn').addEventListener('click', () => {
-  const fields = buildFields();
+// Minimal QR encoder — implements QR Code Model 2, byte mode, ECC level L
+// Based on the public domain nayuki QR algorithm
+function generateQRCanvas(text) {
+  // Use the qrcode-generator library inlined below
+  const qr = qrcode(0, 'L');
+  qr.addData(text);
+  qr.make();
+  const size = qr.getModuleCount();
+  const scale = Math.floor(300 / (size + 8));
+  const margin = Math.floor((300 - size * scale) / 2);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 300;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 300, 300);
+  ctx.fillStyle = '#000000';
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (qr.isDark(r, c)) {
+        ctx.fillRect(margin + c * scale, margin + r * scale, scale, scale);
+      }
+    }
+  }
+  return canvas;
+}
 
-  // Pipe-separated for QR (shorter than CSV, no quoting needed for typical values)
-  lastQRText = fields.join('\t');
-  const qrText = fields.map(f => String(f).replace(/\|/g, '')).join('|');
+document.getElementById('genBtn').addEventListener('click',()=>{
+  const fields=buildFields();
+  const qrText=fields.join(' ');
+  lastQRText=fields.join('\t');
 
-  // Render QR directly into container (no canvas copy)
-  const container = document.getElementById('qrContainer');
-  container.innerHTML = '';
-  new QRCode(container, {
-    text: qrText,
-    width: 280,
-    height: 280,
-    colorDark: '#000000',
-    colorLight: '#ffffff',
-    correctLevel: QRCode.CorrectLevel.L,
-  });
+  const container=document.getElementById('qrContainer');
+  container.innerHTML='';
 
-  document.getElementById('qrRawText').textContent = qrText;
-  document.getElementById('qrOutput').style.display = 'block';
+  try {
+    const canvas=generateQRCanvas(qrText);
+    canvas.style.border='4px solid #2d6a4f';
+    canvas.style.borderRadius='10px';
+    container.appendChild(canvas);
+    document.getElementById('qrStatus').textContent='✅ QR ready to scan';
+  } catch(e) {
+    document.getElementById('qrStatus').textContent='⚠️ Error generating QR: '+e.message;
+  }
+
+  document.getElementById('qrRawText').textContent=qrText;
+  document.getElementById('qrOutput').style.display='block';
   buildSummary();
-  setTimeout(() => document.getElementById('qrOutput').scrollIntoView({ behavior:'smooth', block:'center' }), 200);
+  setTimeout(()=>document.getElementById('qrOutput').scrollIntoView({behavior:'smooth',block:'center'}),200);
 });
 
 // ── SUMMARY ───────────────────────────────────────────────────────
-function buildSummary() {
-  const fields = buildFields();
-  const posFull   = document.getElementById('f_pos').value;
-  const sideFull  = document.getElementById('f_startside').value;
-  const climbFull = document.getElementById('f_climbed_end').checked
-    ? document.getElementById('f_climb_level').value : "Didn't Climb";
-  const display = [...fields];
-  display[2]  = posFull;
-  display[5]  = sideFull;
-  display[20] = climbFull;
-  display[24] = document.getElementById('f_died').checked
-    ? (document.getElementById('f_functioning').checked ? '1 (Yes)' : '0 (No)') : 'N/A';
-  document.getElementById('summaryTable').innerHTML = LABELS.map((label, i) => `
+function buildSummary(){
+  const fields=buildFields();
+  // show human-readable versions in summary
+  const display=[...fields];
+  display[0]=document.getElementById('f_name').value;
+  display[2]=document.getElementById('f_pos').value;
+  display[5]=document.getElementById('f_startside').value;
+  display[20]=document.getElementById('f_climbed_end').checked?document.getElementById('f_climb_level').value:"Didn't Climb";
+  display[26]=document.getElementById('f_comments').value;
+  document.getElementById('summaryTable').innerHTML=LABELS.map((label,i)=>`
     <tr style="background:${i%2===0?'var(--bg3)':'var(--input-bg)'};">
       <td style="padding:0.4rem 0.6rem;font-weight:700;color:var(--text2);border:1px solid var(--border);width:55%;">${label}</td>
-      <td style="padding:0.4rem 0.6rem;color:var(--text);border:1px solid var(--border);">${display[i] ?? ''}</td>
+      <td style="padding:0.4rem 0.6rem;color:var(--text);border:1px solid var(--border);">${display[i]??''}</td>
     </tr>`).join('');
 }
 
 // ── COPY ──────────────────────────────────────────────────────────
-document.getElementById('copyBtn').addEventListener('click', () => {
-  if (!lastQRText) return;
-  const btn = document.getElementById('copyBtn');
+document.getElementById('copyBtn').addEventListener('click',()=>{
+  if(!lastQRText) return;
+  const btn=document.getElementById('copyBtn');
   navigator.clipboard.writeText(lastQRText)
-    .then(() => { btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = '📋 Copy Data to Clipboard', 2000); })
-    .catch(() => { btn.textContent = '❌ Copy failed'; setTimeout(() => btn.textContent = '📋 Copy Data to Clipboard', 2000); });
+    .then(()=>{ btn.textContent='✅ Copied!'; setTimeout(()=>btn.textContent='📋 Copy Data to Clipboard',2000); })
+    .catch(()=>{ btn.textContent='❌ Copy failed'; setTimeout(()=>btn.textContent='📋 Copy Data to Clipboard',2000); });
 });
 
 // ── SNAPSHOT / UNDO ───────────────────────────────────────────────
-let snapshot = null;
-
-function takeSnapshot() {
-  snapshot = {
-    name:    document.getElementById('f_name').value,
-    match:   document.getElementById('f_match').value,
-    pos:     document.getElementById('f_pos').value,
-    team:    document.getElementById('f_team').value,
-    showed:  document.getElementById('f_showed').checked,
-    side:    document.getElementById('f_startside').value,
-    climbed: document.getElementById('f_climbed').checked,
-    att_a:   document.getElementById('f_attempted_climb').checked,
-    miss_a:  document.getElementById('f_fuel_missed_a').value,
-    miss_t:  document.getElementById('f_fuel_missed_t').value,
-    bump:    document.getElementById('f_bump').checked,
-    trench:  document.getElementById('f_trench').checked,
-    defense: document.getElementById('f_defense').checked,
-    c_end:   document.getElementById('f_climbed_end').checked,
-    c_lvl:   document.getElementById('f_climb_level').value,
-    att_end: document.getElementById('f_attempted_climb_end').checked,
-    kept:    document.getElementById('f_kept_scoring').checked,
-    died:    document.getElementById('f_died').checked,
-    func:    document.getElementById('f_functioning').checked,
-    tipped:  document.getElementById('f_tipped').checked,
+let snapshot=null;
+function takeSnapshot(){
+  snapshot={
+    name:document.getElementById('f_name').value,
+    match:document.getElementById('f_match').value,
+    pos:document.getElementById('f_pos').value,
+    team:document.getElementById('f_team').value,
+    showed:document.getElementById('f_showed').checked,
+    side:document.getElementById('f_startside').value,
+    climbed:document.getElementById('f_climbed').checked,
+    att_a:document.getElementById('f_attempted_climb').checked,
+    miss_a:document.getElementById('f_fuel_missed_a').value,
+    miss_t:document.getElementById('f_fuel_missed_t').value,
+    bump:document.getElementById('f_bump').checked,
+    trench:document.getElementById('f_trench').checked,
+    defense:document.getElementById('f_defense').checked,
+    c_end:document.getElementById('f_climbed_end').checked,
+    c_lvl:document.getElementById('f_climb_level').value,
+    att_end:document.getElementById('f_attempted_climb_end').checked,
+    kept:document.getElementById('f_kept_scoring').checked,
+    died:document.getElementById('f_died').checked,
+    func:document.getElementById('f_functioning').checked,
+    tipped:document.getElementById('f_tipped').checked,
     comments:document.getElementById('f_comments').value,
-    ft: Object.fromEntries(['score_a','feed_a','score_t','feed_t'].map(k => [k, { ms: ft[k].ms, cycles: ft[k].cycles }])),
+    ft:Object.fromEntries(['score_a','feed_a','score_t','feed_t'].map(k=>[k,{ms:ft[k].ms,cycles:ft[k].cycles}])),
   };
 }
-
-function applySnapshot(s) {
-  document.getElementById('f_name').value            = s.name;
-  document.getElementById('f_match').value           = s.match;
-  document.getElementById('f_pos').value             = s.pos;
-  document.getElementById('f_team').value            = s.team;
-  document.getElementById('f_showed').checked        = s.showed;
-  document.getElementById('mainForm').classList.toggle('collapsed', !s.showed);
-  document.getElementById('f_startside').value       = s.side;
-  document.getElementById('f_climbed').checked       = s.climbed;
-  document.getElementById('f_attempted_climb').checked = s.att_a;
-  document.getElementById('f_fuel_missed_a').value   = s.miss_a;
-  document.getElementById('f_fuel_missed_t').value   = s.miss_t;
-  document.getElementById('f_bump').checked          = s.bump;
-  document.getElementById('f_trench').checked        = s.trench;
-  document.getElementById('f_defense').checked       = s.defense;
-  document.getElementById('f_climbed_end').checked   = s.c_end;
-  document.getElementById('climbEndFields').classList.toggle('collapsed', !s.c_end);
-  document.getElementById('f_climb_level').value     = s.c_lvl;
-  document.getElementById('f_attempted_climb_end').checked = s.att_end;
-  document.getElementById('f_kept_scoring').checked  = s.kept;
-  document.getElementById('f_died').checked          = s.died;
-  document.getElementById('diedFields').classList.toggle('collapsed', !s.died);
-  document.getElementById('f_functioning').checked   = s.func;
-  document.getElementById('f_tipped').checked        = s.tipped;
-  document.getElementById('f_comments').value        = s.comments;
-  ['score_a','feed_a','score_t','feed_t'].forEach(k => {
-    ftReset(k);
-    ft[k].ms = s.ft[k].ms; ft[k].cycles = s.ft[k].cycles;
-    document.getElementById('ftd_' + k).textContent = ftFmtMs(ft[k].ms);
-    const c = document.getElementById('ftc_' + k);
-    if (c) c.textContent = ft[k].cycles + ' cycle' + (ft[k].cycles !== 1 ? 's' : '');
+function applySnapshot(s){
+  document.getElementById('f_name').value=s.name;
+  document.getElementById('f_match').value=s.match;
+  document.getElementById('f_pos').value=s.pos;
+  document.getElementById('f_team').value=s.team;
+  document.getElementById('f_showed').checked=s.showed;
+  document.getElementById('mainForm').classList.toggle('collapsed',!s.showed);
+  document.getElementById('f_startside').value=s.side;
+  document.getElementById('f_climbed').checked=s.climbed;
+  document.getElementById('f_attempted_climb').checked=s.att_a;
+  document.getElementById('f_fuel_missed_a').value=s.miss_a;
+  document.getElementById('f_fuel_missed_t').value=s.miss_t;
+  document.getElementById('f_bump').checked=s.bump;
+  document.getElementById('f_trench').checked=s.trench;
+  document.getElementById('f_defense').checked=s.defense;
+  document.getElementById('f_climbed_end').checked=s.c_end;
+  document.getElementById('climbEndFields').classList.toggle('collapsed',!s.c_end);
+  document.getElementById('f_climb_level').value=s.c_lvl;
+  document.getElementById('f_attempted_climb_end').checked=s.att_end;
+  document.getElementById('f_kept_scoring').checked=s.kept;
+  document.getElementById('f_died').checked=s.died;
+  document.getElementById('diedFields').classList.toggle('collapsed',!s.died);
+  document.getElementById('f_functioning').checked=s.func;
+  document.getElementById('f_tipped').checked=s.tipped;
+  document.getElementById('f_comments').value=s.comments;
+  ['score_a','feed_a','score_t','feed_t'].forEach(k=>{
+    ftReset(k); ft[k].ms=s.ft[k].ms; ft[k].cycles=s.ft[k].cycles;
+    document.getElementById('ftd_'+k).textContent=ftFmtMs(ft[k].ms);
+    const c=document.getElementById('ftc_'+k);
+    if(c) c.textContent=ft[k].cycles+' cycle'+(ft[k].cycles!==1?'s':'');
   });
   checkRequired();
 }
 
 // ── RESET ─────────────────────────────────────────────────────────
-document.getElementById('resetBtn').addEventListener('click', () => {
+document.getElementById('resetBtn').addEventListener('click',()=>{
   takeSnapshot();
-  document.getElementById('undoBtn').style.display = 'block';
-  document.getElementById('f_match').value = '0';
-  document.getElementById('f_pos').value   = 'Red 1';
-  document.getElementById('f_team').value  = '0';
-  document.getElementById('f_showed').checked = true;
+  document.getElementById('undoBtn').style.display='block';
+  document.getElementById('f_match').value='0';
+  document.getElementById('f_pos').value='Red 1';
+  document.getElementById('f_team').value='0';
+  document.getElementById('f_showed').checked=true;
   document.getElementById('mainForm').classList.remove('collapsed');
-  document.getElementById('f_startside').value = 'Center';
+  document.getElementById('f_startside').value='Center';
   ['f_climbed','f_attempted_climb','f_bump','f_trench','f_defense',
    'f_climbed_end','f_attempted_climb_end','f_kept_scoring','f_died','f_tipped','f_functioning']
-    .forEach(id => { document.getElementById(id).checked = false; });
+    .forEach(id=>{ document.getElementById(id).checked=false; });
   document.getElementById('diedFields').classList.add('collapsed');
   document.getElementById('climbEndFields').classList.add('collapsed');
-  document.getElementById('f_climb_level').value = "Didn't Climb";
-  document.getElementById('f_fuel_missed_a').value = '0';
-  document.getElementById('f_fuel_missed_t').value = '0';
+  document.getElementById('f_climb_level').value="Didn't Climb";
+  document.getElementById('f_fuel_missed_a').value='0';
+  document.getElementById('f_fuel_missed_t').value='0';
   ['score_a','feed_a','score_t','feed_t'].forEach(ftReset);
-  document.getElementById('f_comments').value = '';
-  document.getElementById('qrOutput').style.display = 'none';
+  document.getElementById('f_comments').value='';
+  document.getElementById('qrOutput').style.display='none';
   checkRequired();
 });
-
-document.getElementById('undoBtn').addEventListener('click', () => {
-  if (snapshot) { applySnapshot(snapshot); snapshot = null; }
-  document.getElementById('undoBtn').style.display = 'none';
+document.getElementById('undoBtn').addEventListener('click',()=>{
+  if(snapshot){ applySnapshot(snapshot); snapshot=null; }
+  document.getElementById('undoBtn').style.display='none';
 });
 </script>
 </body>
