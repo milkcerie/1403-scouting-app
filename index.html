@@ -540,7 +540,7 @@ function generateQRCanvas(text) {
 
 document.getElementById('genBtn').addEventListener('click',()=>{
   const fields=buildFields();
-  const qrText=fields.join(' ');
+  const qrText=fields.join('\t');
   lastQRText=fields.join('\t');
 
   const container=document.getElementById('qrContainer');
