@@ -53,6 +53,8 @@ input[type="text"], input[type="number"], textarea, select {
   width:100%; padding:0.65rem 0.85rem; border:2px solid var(--border); border-radius:8px;
   font-size:1rem; color:var(--text); background:var(--input-bg); transition:border-color 0.2s; -webkit-appearance:none;
 }
+input[type="number"] { -moz-appearance:textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 input[type="text"]:focus, input[type="number"]:focus, textarea:focus, select:focus { outline:none; border-color:var(--green-light); }
 textarea { resize:vertical; min-height:90px; font-family:inherit; }
 select option { background:var(--bg2); }
@@ -216,6 +218,7 @@ select option { background:var(--bg2); }
       <div class="field-label-row"><label>Fuel Scoring Timer (Auto)</label><button class="info-btn" onclick="showInfo('Fuel Scoring Timer (Auto)','Press Play when the robot is actively scoring fuel, Pause when it stops. Records total time spent scoring.')">i</button></div>
       <div class="fuel-timer-box">
         <div class="fuel-timer-display" id="ftd_score_a">0:00</div>
+        <div style="text-align:center;font-size:0.8rem;font-weight:700;color:var(--text2);margin-bottom:0.4rem;" id="ftc_score_a">0 cycles</div>
         <div class="fuel-timer-btns">
           <button class="ft-btn ft-play" id="ftb_score_a" onclick="ftToggle('score_a')">▶ Play</button>
           <button class="ft-btn ft-reset" onclick="ftReset('score_a')">↺ Reset</button>
@@ -270,6 +273,7 @@ select option { background:var(--bg2); }
       <div class="field-label-row"><label>Fuel Scoring Timer (Teleop)</label><button class="info-btn" onclick="showInfo('Fuel Scoring Timer (Teleop)','Press Play when the robot is actively scoring fuel, Pause when it stops.')">i</button></div>
       <div class="fuel-timer-box">
         <div class="fuel-timer-display" id="ftd_score_t">0:00</div>
+        <div style="text-align:center;font-size:0.8rem;font-weight:700;color:var(--text2);margin-bottom:0.4rem;" id="ftc_score_t">0 cycles</div>
         <div class="fuel-timer-btns">
           <button class="ft-btn ft-play" id="ftb_score_t" onclick="ftToggle('score_t')">▶ Play</button>
           <button class="ft-btn ft-reset" onclick="ftReset('score_t')">↺ Reset</button>
@@ -347,17 +351,15 @@ select option { background:var(--bg2); }
       <div class="dep-fields collapsible collapsed" id="diedFields">
         <div class="field" style="margin-bottom:0.75rem;">
           <div class="bool-row">
-            <div class="field-label-row"><label>Approx. Time Robot Died</label><button class="info-btn" onclick="showInfo('Approx. Time Robot Died','Stamp the match timer timestamp when the robot died. Always included in QR output.')">i</button></div>
-            <button class="timer-btn btn-pause" style="width:auto;padding:0.4rem 0.9rem;font-size:0.85rem;" onclick="stampDied()">📌 Stamp</button>
+            <div class="field-label-row"><label>Approx. Time Robot Died</label><button class="info-btn" onclick="showInfo('Approx. Time Robot Died','Did the robot die early in the match or late? Always included in QR output.')">i</button></div>
+            <label class="toggle"><input type="checkbox" id="f_time_died"><span class="slider"></span></label>
           </div>
-          <input type="text" id="f_time_died" placeholder="Timer not running" readonly style="margin-top:0.4rem;background:var(--bg3);">
         </div>
         <div class="field" style="margin-bottom:0;">
           <div class="bool-row">
             <div class="field-label-row"><label>Functioning Again?</label><button class="info-btn" onclick="showInfo('Functioning Again?','Did the robot start functioning again after dying? Always included in QR output.')">i</button></div>
-            <button class="timer-btn btn-start" style="width:auto;padding:0.4rem 0.9rem;font-size:0.85rem;" onclick="stampFunctioning()">📌 Stamp</button>
+            <label class="toggle"><input type="checkbox" id="f_functioning"><span class="slider"></span></label>
           </div>
-          <input type="text" id="f_functioning" placeholder="Timer not running" readonly style="margin-top:0.4rem;background:var(--bg3);">
         </div>
       </div>
     </div>
@@ -523,11 +525,13 @@ function generateQR() {
     b('f_attempted_climb'),
     document.getElementById('f_fuel_missed_a').value,
     ftFmt('score_a'),
+    String(ftState.score_a.cycles),
     ftFmt('feed_a'),
     b('f_bump'),
     b('f_trench'),
     document.getElementById('f_fuel_missed_t').value,
     ftFmt('score_t'),
+    String(ftState.score_t.cycles),
     ftFmt('feed_t'),
     b('f_defense'),
     b('f_climbed_end'),
@@ -535,8 +539,8 @@ function generateQR() {
     b('f_attempted_climb_end'),
     b('f_kept_scoring'),
     b('f_died'),
-    document.getElementById('f_died').checked ? (document.getElementById('f_time_died').value||'0:00') : 'N/A',
-    document.getElementById('f_died').checked ? (document.getElementById('f_functioning').value||'0') : 'N/A',
+    document.getElementById('f_died').checked ? b('f_time_died') : 'N/A',
+    document.getElementById('f_died').checked ? b('f_functioning') : 'N/A',
     b('f_tipped'),
     document.getElementById('f_comments').value,
   ];
@@ -573,11 +577,13 @@ function buildSummary() {
     ['Unsuccessfully Attempted Climb? (Auto)', document.getElementById('f_attempted_climb').checked?'TRUE':'FALSE'],
     ['Fuel Missed (Auto)', document.getElementById('f_fuel_missed_a').value],
     ['Fuel Scoring Time (Auto)', ftFmt('score_a')],
+    ['Fuel Scoring Cycles (Auto)', String(ftState.score_a.cycles)],
     ['Fuel Feeding Time (Auto)', ftFmt('feed_a')],
     ['Crossed Bump?', document.getElementById('f_bump').checked?'TRUE':'FALSE'],
     ['Crossed Trench?', document.getElementById('f_trench').checked?'TRUE':'FALSE'],
     ['Fuel Missed (Teleop)', document.getElementById('f_fuel_missed_t').value],
     ['Fuel Scoring Time (Teleop)', ftFmt('score_t')],
+    ['Fuel Scoring Cycles (Teleop)', String(ftState.score_t.cycles)],
     ['Fuel Feeding Time (Teleop)', ftFmt('feed_t')],
     ['Played Defense?', document.getElementById('f_defense').checked?'TRUE':'FALSE'],
     ['Climbed Tower? (Endgame)', document.getElementById('f_climbed_end').checked?'TRUE':'FALSE'],
@@ -585,8 +591,8 @@ function buildSummary() {
     ['Unsuccessfully Attempted Climb? (Endgame)', document.getElementById('f_attempted_climb_end').checked?'TRUE':'FALSE'],
     ['Kept Scoring Until End?', document.getElementById('f_kept_scoring').checked?'TRUE':'FALSE'],
     ['Died?', document.getElementById('f_died').checked?'TRUE':'FALSE'],
-    ['Approx. Time Robot Died', document.getElementById('f_died').checked?(document.getElementById('f_time_died').value||'0:00'):'N/A'],
-    ['Functioning Again?', document.getElementById('f_died').checked?(document.getElementById('f_functioning').value||'0'):'N/A'],
+    ['Approx. Time Robot Died', document.getElementById('f_died').checked ? (document.getElementById('f_time_died').checked?'TRUE':'FALSE') : 'N/A'],
+    ['Functioning Again?', document.getElementById('f_died').checked ? (document.getElementById('f_functioning').checked?'TRUE':'FALSE') : 'N/A'],
     ['Tipped Over?', document.getElementById('f_tipped').checked?'TRUE':'FALSE'],
     ['Comments', document.getElementById('f_comments').value||'—'],
   ];
@@ -617,7 +623,7 @@ function resetForm() {
   document.getElementById('mainForm').classList.remove('collapsed');
   document.getElementById('f_startside').value='Center';
   timerReset();
-  ['f_climbed','f_attempted_climb','f_bump','f_trench','f_defense','f_climbed_end','f_attempted_climb_end','f_kept_scoring','f_died','f_tipped'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
+  ['f_climbed','f_attempted_climb','f_bump','f_trench','f_defense','f_climbed_end','f_attempted_climb_end','f_kept_scoring','f_died','f_tipped','f_time_died','f_functioning'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
   document.getElementById('diedFields').classList.add('collapsed');
   document.getElementById('climbEndFields').classList.add('collapsed');
   document.getElementById('f_climb_level').value="Didn't Climb";
