@@ -327,11 +327,14 @@ select option { background:var(--bg2); }
 <div class="action-btns">
   <button class="gen-btn" id="genBtn" disabled style="opacity:0.4;cursor:not-allowed;">📷 Generate QR Code</button>
   <button class="rst-btn" id="resetBtn">↺ Reset Form</button>
+  <button class="rst-btn" id="undoBtn" style="display:none;border-color:#e67e22;color:#e67e22;">↩ Undo Reset</button>
 </div>
 
 <div id="qrOutput">
-  <button class="rst-btn" id="copyBtn" style="margin-top:0.75rem;font-size:0.85rem;padding:0.55rem;">📋 Copy Data to Clipboard</button>
-  <div id="qrContainer" style="display:flex;justify-content:center;margin-bottom:0.5rem;"></div>
+  <p style="font-size:0.82rem;color:var(--text2);margin-bottom:0.75rem;">Scan with your Bluetooth scanner — comma-separated values paste across columns in Google Sheets</p>
+  <div id="qrContainer" style="display:flex;justify-content:center;margin-bottom:0.75rem;"></div>
+  <div id="qrRawText" style="font-size:0.72rem;color:var(--text2);word-break:break-all;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:0.5rem;margin-bottom:0.5rem;text-align:left;"></div>
+  <button class="rst-btn" id="copyBtn" style="margin-top:0.25rem;font-size:0.85rem;padding:0.55rem;">📋 Copy Data to Clipboard</button>
   <details style="margin-top:0.75rem;text-align:left;">
     <summary style="cursor:pointer;font-size:0.85rem;font-weight:700;color:var(--text3);padding:0.5rem;border:1.5px solid var(--border);border-radius:8px;list-style:none;text-align:center;">🔍 Verify Submitted Data</summary>
     <table id="summaryTable" style="width:100%;margin-top:0.6rem;border-collapse:collapse;font-size:0.82rem;"></table>
@@ -512,7 +515,76 @@ let lastQRText = '';
 
 function b(id) { return document.getElementById(id).checked ? '1' : '0'; }
 
-document.getElementById('genBtn').addEventListener('click', () => {
+let lastFormSnapshot = null;
+
+function snapshotForm() {
+  lastFormSnapshot = {
+    name: document.getElementById('f_name').value,
+    match: document.getElementById('f_match').value,
+    pos: document.getElementById('f_pos').value,
+    team: document.getElementById('f_team').value,
+    showed: document.getElementById('f_showed').checked,
+    startside: document.getElementById('f_startside').value,
+    climbed: document.getElementById('f_climbed').checked,
+    attempted_climb: document.getElementById('f_attempted_climb').checked,
+    fuel_missed_a: document.getElementById('f_fuel_missed_a').value,
+    fuel_missed_t: document.getElementById('f_fuel_missed_t').value,
+    bump: document.getElementById('f_bump').checked,
+    trench: document.getElementById('f_trench').checked,
+    defense: document.getElementById('f_defense').checked,
+    climbed_end: document.getElementById('f_climbed_end').checked,
+    climb_level: document.getElementById('f_climb_level').value,
+    attempted_climb_end: document.getElementById('f_attempted_climb_end').checked,
+    kept_scoring: document.getElementById('f_kept_scoring').checked,
+    died: document.getElementById('f_died').checked,
+    functioning: document.getElementById('f_functioning').checked,
+    tipped: document.getElementById('f_tipped').checked,
+    comments: document.getElementById('f_comments').value,
+    ft: {
+      score_a: { ms: ft.score_a.ms, cycles: ft.score_a.cycles },
+      feed_a:  { ms: ft.feed_a.ms,  cycles: ft.feed_a.cycles  },
+      score_t: { ms: ft.score_t.ms, cycles: ft.score_t.cycles },
+      feed_t:  { ms: ft.feed_t.ms,  cycles: ft.feed_t.cycles  },
+    }
+  };
+}
+
+function restoreSnapshot(snap) {
+  document.getElementById('f_name').value = snap.name;
+  document.getElementById('f_match').value = snap.match;
+  document.getElementById('f_pos').value = snap.pos;
+  document.getElementById('f_team').value = snap.team;
+  document.getElementById('f_showed').checked = snap.showed;
+  document.getElementById('mainForm').classList.toggle('collapsed', !snap.showed);
+  document.getElementById('f_startside').value = snap.startside;
+  document.getElementById('f_climbed').checked = snap.climbed;
+  document.getElementById('f_attempted_climb').checked = snap.attempted_climb;
+  document.getElementById('f_fuel_missed_a').value = snap.fuel_missed_a;
+  document.getElementById('f_fuel_missed_t').value = snap.fuel_missed_t;
+  document.getElementById('f_bump').checked = snap.bump;
+  document.getElementById('f_trench').checked = snap.trench;
+  document.getElementById('f_defense').checked = snap.defense;
+  document.getElementById('f_climbed_end').checked = snap.climbed_end;
+  document.getElementById('climbEndFields').classList.toggle('collapsed', !snap.climbed_end);
+  document.getElementById('f_climb_level').value = snap.climb_level;
+  document.getElementById('f_attempted_climb_end').checked = snap.attempted_climb_end;
+  document.getElementById('f_kept_scoring').checked = snap.kept_scoring;
+  document.getElementById('f_died').checked = snap.died;
+  document.getElementById('diedFields').classList.toggle('collapsed', !snap.died);
+  document.getElementById('f_functioning').checked = snap.functioning;
+  document.getElementById('f_tipped').checked = snap.tipped;
+  document.getElementById('f_comments').value = snap.comments;
+  // Restore fuel timers
+  ['score_a','feed_a','score_t','feed_t'].forEach(key => {
+    ftReset(key);
+    ft[key].ms = snap.ft[key].ms;
+    ft[key].cycles = snap.ft[key].cycles;
+    document.getElementById('ftd_' + key).textContent = ftFmtMs(ft[key].ms);
+    const cycleEl = document.getElementById('ftc_' + key);
+    if (cycleEl) cycleEl.textContent = ft[key].cycles + ' cycle' + (ft[key].cycles !== 1 ? 's' : '');
+  });
+  checkRequired();
+}
   const climbVal = document.getElementById('f_climbed_end').checked
     ? document.getElementById('f_climb_level').value : "Didn't Climb";
 
@@ -547,6 +619,11 @@ document.getElementById('genBtn').addEventListener('click', () => {
   ];
 
   lastQRText = fields.join('\t');
+
+  // Also build a comma-separated version for the QR code (tabs are unreliable in QR scanners)
+  // Escape any commas in free-text fields
+  const qrFields = fields.map(f => String(f).includes(',') ? '"' + String(f).replace(/"/g, '""') + '"' : String(f));
+  const qrText = qrFields.join(',');
   const out = document.getElementById('qrOutput');
   out.style.display = 'block';
 
@@ -555,12 +632,13 @@ document.getElementById('genBtn').addEventListener('click', () => {
   container.innerHTML = '';
 
   new QRCode(container, {
-    text: lastQRText,
+    text: qrText,
     width: 300,
     height: 300,
     correctLevel: QRCode.CorrectLevel.L
   });
 
+  document.getElementById('qrRawText').textContent = qrText;
   buildSummary();
   setTimeout(() => out.scrollIntoView({ behavior:'smooth', block:'center' }), 150);
 });
@@ -621,6 +699,8 @@ document.getElementById('copyBtn').addEventListener('click', () => {
 
 // ── RESET ─────────────────────────────────────────────────────────
 document.getElementById('resetBtn').addEventListener('click', () => {
+  snapshotForm();
+  document.getElementById('undoBtn').style.display = 'block';
   document.getElementById('f_match').value = '0';
   document.getElementById('f_pos').value = 'Red 1';
   document.getElementById('f_team').value = '0';
@@ -639,6 +719,14 @@ document.getElementById('resetBtn').addEventListener('click', () => {
   document.getElementById('f_comments').value = '';
   document.getElementById('qrOutput').style.display = 'none';
   checkRequired();
+});
+
+document.getElementById('undoBtn').addEventListener('click', () => {
+  if (lastFormSnapshot) {
+    restoreSnapshot(lastFormSnapshot);
+    lastFormSnapshot = null;
+  }
+  document.getElementById('undoBtn').style.display = 'none';
 });
 </script>
 </body>
