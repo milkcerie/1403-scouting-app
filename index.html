@@ -492,34 +492,37 @@ document.getElementById('modal').addEventListener('click', e => {
 function bv(id) { return document.getElementById(id).checked ? '1' : '0'; }
 
 function buildFields() {
+  const climbMap = { "Didn't Climb":"0", "Level 1":"1", "Level 2":"2", "Level 3":"3" };
+  const posMap   = { "Red 1":"R1","Red 2":"R2","Red 3":"R3","Blue 1":"B1","Blue 2":"B2","Blue 3":"B3" };
+  const sideMap  = { "Center":"C","Depot Side":"D","Non-Depot Side":"N" };
   const climbVal = document.getElementById('f_climbed_end').checked
-    ? document.getElementById('f_climb_level').value : "Didn't Climb";
+    ? climbMap[document.getElementById('f_climb_level').value] ?? '0' : '0';
   return [
     document.getElementById('f_name').value,
     document.getElementById('f_match').value,
-    document.getElementById('f_pos').value,
+    posMap[document.getElementById('f_pos').value] ?? document.getElementById('f_pos').value,
     document.getElementById('f_team').value,
     bv('f_showed'),
-    document.getElementById('f_startside').value,
+    sideMap[document.getElementById('f_startside').value] ?? document.getElementById('f_startside').value,
     bv('f_climbed'),
     bv('f_attempted_climb'),
     document.getElementById('f_fuel_missed_a').value,
-    ftSecs('score_a'),
+    (ft.score_a.ms / 1000).toFixed(1),
     String(ft.score_a.cycles),
-    ftSecs('feed_a'),
+    (ft.feed_a.ms / 1000).toFixed(1),
     bv('f_bump'),
     bv('f_trench'),
     document.getElementById('f_fuel_missed_t').value,
-    ftSecs('score_t'),
+    (ft.score_t.ms / 1000).toFixed(1),
     String(ft.score_t.cycles),
-    ftSecs('feed_t'),
+    (ft.feed_t.ms / 1000).toFixed(1),
     bv('f_defense'),
     bv('f_climbed_end'),
     climbVal,
     bv('f_attempted_climb_end'),
     bv('f_kept_scoring'),
     bv('f_died'),
-    document.getElementById('f_died').checked ? bv('f_functioning') : 'N/A',
+    document.getElementById('f_died').checked ? bv('f_functioning') : 'N',
     bv('f_tipped'),
     document.getElementById('f_comments').value,
   ];
@@ -541,14 +544,9 @@ let lastQRText = '';
 document.getElementById('genBtn').addEventListener('click', () => {
   const fields = buildFields();
 
-  // Tab-separated for clipboard; comma-separated (CSV) for QR
+  // Pipe-separated for QR (shorter than CSV, no quoting needed for typical values)
   lastQRText = fields.join('\t');
-  const csvFields = fields.map(f => {
-    const s = String(f);
-    return (s.includes(',') || s.includes('"') || s.includes('\n'))
-      ? '"' + s.replace(/"/g, '""') + '"' : s;
-  });
-  const qrText = csvFields.join(',');
+  const qrText = fields.map(f => String(f).replace(/\|/g, '')).join('|');
 
   // Render QR directly into container (no canvas copy)
   const container = document.getElementById('qrContainer');
@@ -571,10 +569,20 @@ document.getElementById('genBtn').addEventListener('click', () => {
 // ── SUMMARY ───────────────────────────────────────────────────────
 function buildSummary() {
   const fields = buildFields();
+  const posFull   = document.getElementById('f_pos').value;
+  const sideFull  = document.getElementById('f_startside').value;
+  const climbFull = document.getElementById('f_climbed_end').checked
+    ? document.getElementById('f_climb_level').value : "Didn't Climb";
+  const display = [...fields];
+  display[2]  = posFull;
+  display[5]  = sideFull;
+  display[20] = climbFull;
+  display[24] = document.getElementById('f_died').checked
+    ? (document.getElementById('f_functioning').checked ? '1 (Yes)' : '0 (No)') : 'N/A';
   document.getElementById('summaryTable').innerHTML = LABELS.map((label, i) => `
     <tr style="background:${i%2===0?'var(--bg3)':'var(--input-bg)'};">
       <td style="padding:0.4rem 0.6rem;font-weight:700;color:var(--text2);border:1px solid var(--border);width:55%;">${label}</td>
-      <td style="padding:0.4rem 0.6rem;color:var(--text);border:1px solid var(--border);">${fields[i] ?? ''}</td>
+      <td style="padding:0.4rem 0.6rem;color:var(--text);border:1px solid var(--border);">${display[i] ?? ''}</td>
     </tr>`).join('');
 }
 
