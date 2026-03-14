@@ -50,12 +50,12 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margi
 textarea { resize:vertical; min-height:90px; font-family:inherit; }
 select option { background:var(--bg2); }
 /* MULTI-STEPPER */
-.mstepper { display:grid; grid-template-columns:repeat(7,1fr); border:2px solid var(--border); border-radius:8px; overflow:hidden; }
+.mstepper { display:grid; grid-template-columns:repeat(3, 1fr) 1.6fr repeat(3, 1fr); border:2px solid var(--border); border-radius:8px; overflow:hidden; }
 .ms-btn { background:var(--bg3); border:none; border-right:1px solid var(--border); color:var(--text); font-size:1rem; font-weight:800; height:56px; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
 .ms-btn:last-child { border-right:none; border-left:1px solid var(--border); }
 .ms-btn:nth-child(5), .ms-btn:nth-child(6) { border-left:1px solid var(--border); border-right:1px solid var(--border); }
 .ms-btn:active { background:var(--green); color:#fff; }
-.ms-val { text-align:center; font-size:1.1rem; font-weight:700; color:var(--text); background:var(--input-bg); border:none; border-left:2px solid var(--border); border-right:2px solid var(--border); height:56px; width:100%; outline:none; -moz-appearance:textfield; }
+.ms-val { text-align:center; font-size:1.1rem; font-weight:700; color:var(--text); background:var(--input-bg); border:none; border-left:2px solid var(--border); border-right:2px solid var(--border); height:56px; min-width:52px; width:calc(100% + 20px); outline:none; -moz-appearance:textfield; }
 .ms-val::-webkit-inner-spin-button, .ms-val::-webkit-outer-spin-button { -webkit-appearance:none; }
 /* BASIC STEPPER */
 .stepper { display:flex; align-items:center; border:2px solid var(--border); border-radius:8px; overflow:hidden; }
